@@ -8,22 +8,27 @@ import akka.stream._
 import akka.stream.scaladsl._
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.model.ws._
+import akka.pattern.after
 
 import scala.concurrent.Future
 import scala.concurrent.duration._
-import scala.util.{Failure, Success, Try}
+import scala.util.Try
+
 import spray.json._
+
 import model._
 
 import com.redis._
 
 object SlackBot extends App {
   implicit val system = ActorSystem()
+
   import system.dispatcher
+  import system.scheduler
 
   private val redisClient = new RedisClient("localhost", 6379)
 
-  private def startRealTimeConnection(token: String): Future[String] = {
+  private def getWebsocketUrl(token: String): Future[String] = {
     val queryParams = Query(("token" -> token))
 
     for {
@@ -99,7 +104,7 @@ object SlackBot extends App {
     )
   }
 
-  private def connectToSocket(url: String) = {
+  private def connectToSocket(url: String): Future[Done] = {
 
     val bufferSize = 10
     val elementsToProcess = 5
@@ -137,17 +142,21 @@ object SlackBot extends App {
       }
     }
 
-    connected.onComplete(println)
-    closed.foreach(_ => println("closed"))
+    connected.foreach(_ => println("Successfully connected to Slack."))
+    closed
   }
 
-  val f = for {
-      url <- startRealTimeConnection("<>")
-      _ = connectToSocket(url)
-    } yield(())
+  private def fetchUrlAndConnect: Future[Done] = (for {
+    url <- getWebsocketUrl("<tokenhere>")
+    _ <- connectToSocket(url)
+    _ =  println("Slack closed the connection. Trying to reconnect...")
+    reconnect <- fetchUrlAndConnect
+  } yield reconnect).recoverWith{
+    case err =>
+      println(err.getMessage)
+      after(1.second, system.scheduler)(fetchUrlAndConnect)
+  }
 
-  f.onComplete {
-      case Success(url) => println(url)
-      case Failure(t) => println("An error has occurred: " + t.getMessage)
-    }
+  fetchUrlAndConnect
+
 }
