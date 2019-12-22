@@ -11,10 +11,8 @@ import akka.http.scaladsl.model.ws._
 
 import scala.concurrent.Future
 import scala.concurrent.duration._
-import scala.util.{Failure, Success}
-
+import scala.util.{Failure, Success, Try}
 import spray.json._
-
 import model._
 
 object SlackBot extends App {
@@ -37,6 +35,37 @@ object SlackBot extends App {
     } yield webSocketUrl
   }
 
+  private def getResponse(incoming: Message): Option[Message] = {
+    incoming match {
+      case textMessage: TextMessage => handleJson(textMessage.getStrictText.parseJson.asJsObject)
+      case binaryMessage: BinaryMessage => handleJson(binaryMessage.getStrictData.utf8String.parseJson.asJsObject)
+    }
+  }
+
+  private  def handleJson(jsObject: JsObject): Option[Message] = {
+    jsObject.fields.get("type") match {
+      case Some(JsString("message")) => Try(jsObject.convertTo[SlackMessage]).toOption.flatMap(handleSlackMessage)
+      case _ => None
+    }
+  }
+
+  private val setKeyPattern = """(:?SET KEY)\s(\w+)\s(\w+)""".r
+  private val getKeyPattern = """(:?GET KEY)\s(\w+)""".r
+
+  private def handleSlackMessage(slackMessage: SlackMessage): Option[Message] = {
+    slackMessage.text match {
+      case setKeyPattern(_, key, value) => Some(responseFromString(s"setting key $key to value $value", slackMessage))
+      case getKeyPattern(_, key) => Some(responseFromString(s"getting value for key $key", slackMessage))
+      case _ => None
+    }
+  }
+
+  private def responseFromString(str: String, slackMessage: SlackMessage) = {
+    TextMessage(
+      SlackMessage("message", str, slackMessage.channel).toJson.toString
+    )
+  }
+
   private def connectToSocket(url: String) = {
 
     val bufferSize = 10
@@ -54,7 +83,9 @@ object SlackBot extends App {
 
     val sink = Sink.foreach[Message]{ in =>
       println(s"IN $in")
-      queue.offer(in)
+      getResponse(in).map(response =>
+        queue.offer(response)
+      )
     }
 
     val webSocketFlow = Http().webSocketClientFlow(WebSocketRequest(url))
