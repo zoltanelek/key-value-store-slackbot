@@ -15,9 +15,13 @@ import scala.util.{Failure, Success, Try}
 import spray.json._
 import model._
 
+import com.redis._
+
 object SlackBot extends App {
   implicit val system = ActorSystem()
   import system.dispatcher
+
+  private val redisClient = new RedisClient("localhost", 6379)
 
   private def startRealTimeConnection(token: String): Future[String] = {
     val queryParams = Query(("token" -> token))
@@ -53,10 +57,39 @@ object SlackBot extends App {
   private val getKeyPattern = """(:?GET KEY)\s(\w+)""".r
 
   private def handleSlackMessage(slackMessage: SlackMessage): Option[Message] = {
-    slackMessage.text match {
-      case setKeyPattern(_, key, value) => Some(responseFromString(s"setting key $key to value $value", slackMessage))
-      case getKeyPattern(_, key) => Some(responseFromString(s"getting value for key $key", slackMessage))
+    val returning = slackMessage.text match {
+      case setKeyPattern(_, key, value) => Some(handleSetKey(key, value, slackMessage))
+      case getKeyPattern(_, key) => Some(handleGetKey(key, slackMessage))
       case _ => None
+    }
+    println(s"returning: $returning")
+    returning
+  }
+
+  private def handleGetKey(key: String, slackMessage: SlackMessage) = {
+    println(s"handleGetKey(key $key)")
+    val valueOpt = Try(redisClient.get(key)).getOrElse(None)
+    valueOpt.map { value =>
+      println(s"from redis: key $key value $value")
+      responseFromString(s"$key: $value", slackMessage)
+    }.getOrElse {
+      println(s"Could not find value for key $key")
+      responseFromString(s"Could not find value for key $key", slackMessage)
+    }
+  }
+
+  private def handleSetKey(key: String, value: String, slackMessage: SlackMessage) = {
+    println(s"handleSetKey(key $key, value $value)")
+    val isSuccessful = Try(redisClient.set(key, value)).recover{
+      case err =>
+        println(err.getMessage)
+        false
+    }.getOrElse(false)
+    println(s"to redis: key $key value $value")
+    if (isSuccessful){
+      responseFromString(s"$key: $value", slackMessage)
+    } else {
+      responseFromString(s"Could not set $value for key $key", slackMessage)
     }
   }
 

@@ -14,5 +14,6 @@ libraryDependencies ++= Seq(
   "com.typesafe.akka" %% "akka-http-spray-json" % akkaHttpVersion,
   "ch.qos.logback" % "logback-classic" % "1.2.3",
   "org.scalatest" %% "scalatest" % "3.0.8" % Test,
-  "org.scalacheck" %% "scalacheck" % "1.14.1" % Test
+  "org.scalacheck" %% "scalacheck" % "1.14.1" % Test,
+  "net.debasishg" %% "redisclient" % "3.20"
 )
