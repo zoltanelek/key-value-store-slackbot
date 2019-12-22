@@ -4,11 +4,11 @@ import akka.actor.ActorSystem
 import akka.Done
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.Uri.Query
-import akka.stream._
-import akka.stream.scaladsl._
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.model.ws._
 import akka.pattern.after
+import akka.stream._
+import akka.stream.scaladsl._
 
 import scala.concurrent.Future
 import scala.concurrent.duration._
@@ -24,7 +24,6 @@ object SlackBot extends App {
   implicit val system = ActorSystem()
 
   import system.dispatcher
-  import system.scheduler
 
   private val redisClient = new RedisClient("localhost", 6379)
 
@@ -71,38 +70,39 @@ object SlackBot extends App {
     returning
   }
 
-  private def handleGetKey(key: String, slackMessage: SlackMessage) = {
-    println(s"handleGetKey(key $key)")
-    val valueOpt = Try(redisClient.get(key)).getOrElse(None)
+  private def handleGetKey(key: String, slackMessage: SlackMessage): Message = {
+    val channel = slackMessage.channel
+    val valueOpt = Try(redisClient.get(calculateRedisKey(key, slackMessage.channel))).getOrElse(None)
     valueOpt.map { value =>
-      println(s"from redis: key $key value $value")
-      responseFromString(s"$key: $value", slackMessage)
+      responseFromString(s"$key: $value", channel)
     }.getOrElse {
-      println(s"Could not find value for key $key")
-      responseFromString(s"Could not find value for key $key", slackMessage)
+      responseFromString(s"Could not find value for key $key in this channel", channel)
     }
   }
 
-  private def handleSetKey(key: String, value: String, slackMessage: SlackMessage) = {
-    println(s"handleSetKey(key $key, value $value)")
-    val isSuccessful = Try(redisClient.set(key, value)).recover{
+  /**
+   * Calculate the final redis key from the channel Id and the key.
+   */
+  private def calculateRedisKey(key: String, channel: String): String = s"$channel-$key"
+
+  private def handleSetKey(key: String, value: String, slackMessage: SlackMessage): Message = {
+    val channel = slackMessage.channel
+    val isSuccessful = Try(redisClient.set(calculateRedisKey(key, slackMessage.channel), value)).recover{
       case err =>
         println(err.getMessage)
         false
     }.getOrElse(false)
-    println(s"to redis: key $key value $value")
     if (isSuccessful){
-      responseFromString(s"$key: $value", slackMessage)
+      responseFromString(s"$key: $value", channel)
     } else {
-      responseFromString(s"Could not set $value for key $key", slackMessage)
+      responseFromString(s"Could not set $value for key $key", channel)
     }
   }
 
-  private def responseFromString(str: String, slackMessage: SlackMessage) = {
+  private def responseFromString(str: String, channel: String): Message =
     TextMessage(
-      SlackMessage("message", str, slackMessage.channel).toJson.toString
+      SlackMessage("message", str, channel).toJson.toString
     )
-  }
 
   private def connectToSocket(url: String): Future[Done] = {
 
@@ -147,7 +147,7 @@ object SlackBot extends App {
   }
 
   private def fetchUrlAndConnect: Future[Done] = (for {
-    url <- getWebsocketUrl("<tokenhere>")
+    url <- getWebsocketUrl("xoxb-874127260400-863862695521-TQvsjwdYyQaZqm0OzHRrkjkS")
     _ <- connectToSocket(url)
     _ =  println("Slack closed the connection. Trying to reconnect...")
     reconnect <- fetchUrlAndConnect
