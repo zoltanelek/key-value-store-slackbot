@@ -27,6 +27,7 @@ object SlackBot extends App {
   import system.dispatcher
 
   private val log = Logger("SlackBot")
+  private val config = ConfigLoader.loadConfig
   private val redisClient = new RedisClient("localhost", 6379)
 
   private def getWebsocketUrl(token: String): Future[String] = {
@@ -62,15 +63,12 @@ object SlackBot extends App {
   private val setKeyPattern = """(:?SET KEY)\s(\w+)\s(\w+)""".r
   private val getKeyPattern = """(:?GET KEY)\s(\w+)""".r
 
-  private def handleSlackMessage(slackMessage: SlackMessage): Option[Message] = {
-    val returning = slackMessage.text match {
+  private def handleSlackMessage(slackMessage: SlackMessage): Option[Message] =
+    slackMessage.text match {
       case setKeyPattern(_, key, value) => Some(handleSetKey(key, value, slackMessage))
       case getKeyPattern(_, key) => Some(handleGetKey(key, slackMessage))
       case _ => None
     }
-    log.info(s"returning: $returning")
-    returning
-  }
 
   private def handleGetKey(key: String, slackMessage: SlackMessage): Message = {
     val channel = slackMessage.channel
@@ -149,7 +147,7 @@ object SlackBot extends App {
   }
 
   private def fetchUrlAndConnect: Future[Done] = (for {
-    url <- getWebsocketUrl("<tokenhere>")
+    url <- getWebsocketUrl(config.token)
     _ <- connectToSocket(url)
     _ =  log.info("Slack closed the connection. Trying to reconnect...")
     reconnect <- fetchUrlAndConnect
