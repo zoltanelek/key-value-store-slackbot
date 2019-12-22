@@ -2,6 +2,7 @@ package logic
 
 import akka.actor.ActorSystem
 import akka.Done
+import akka.event.slf4j.Logger
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.Uri.Query
 import akka.http.scaladsl.model._
@@ -25,6 +26,7 @@ object SlackBot extends App {
 
   import system.dispatcher
 
+  private val log = Logger("SlackBot")
   private val redisClient = new RedisClient("localhost", 6379)
 
   private def getWebsocketUrl(token: String): Future[String] = {
@@ -66,7 +68,7 @@ object SlackBot extends App {
       case getKeyPattern(_, key) => Some(handleGetKey(key, slackMessage))
       case _ => None
     }
-    println(s"returning: $returning")
+    log.info(s"returning: $returning")
     returning
   }
 
@@ -89,7 +91,7 @@ object SlackBot extends App {
     val channel = slackMessage.channel
     val isSuccessful = Try(redisClient.set(calculateRedisKey(key, slackMessage.channel), value)).recover{
       case err =>
-        println(err.getMessage)
+        log.error(err.getMessage)
         false
     }.getOrElse(false)
     if (isSuccessful){
@@ -113,14 +115,14 @@ object SlackBot extends App {
       .queue[Message](bufferSize, OverflowStrategy.backpressure)
       .throttle(elementsToProcess, 3.second)
       .map { out =>
-        println(s"OUT $out")
+        log.debug(s"OUT $out")
         out
       }
 
     val (queue, source) = queueDescription.preMaterialize
 
     val sink = Sink.foreach[Message]{ in =>
-      println(s"IN $in")
+      log.debug(s"IN $in")
       getResponse(in).map(response =>
         queue.offer(response)
       )
@@ -142,18 +144,18 @@ object SlackBot extends App {
       }
     }
 
-    connected.foreach(_ => println("Successfully connected to Slack."))
+    connected.foreach(_ => log.info("Successfully connected to Slack."))
     closed
   }
 
   private def fetchUrlAndConnect: Future[Done] = (for {
-    url <- getWebsocketUrl("xoxb-874127260400-863862695521-TQvsjwdYyQaZqm0OzHRrkjkS")
+    url <- getWebsocketUrl("<tokenhere>")
     _ <- connectToSocket(url)
-    _ =  println("Slack closed the connection. Trying to reconnect...")
+    _ =  log.info("Slack closed the connection. Trying to reconnect...")
     reconnect <- fetchUrlAndConnect
   } yield reconnect).recoverWith{
     case err =>
-      println(err.getMessage)
+      log.error(err.getMessage)
       after(1.second, system.scheduler)(fetchUrlAndConnect)
   }
 
