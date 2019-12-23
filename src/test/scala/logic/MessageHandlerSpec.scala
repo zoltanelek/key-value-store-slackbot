@@ -6,8 +6,8 @@ import org.scalamock.scalatest.MockFactory
 class MessageHandlerSpec extends FlatSpec with Matchers with MockFactory {
 
   private val channel = "testChannel"
-  private val testKey = "foo"
-  private val testValue = "bar"
+  private val testKey = "testKey1234"
+  private val testValue = "testValue4321"
   private val mockedKeyValueStore = stub[KeyValueStore]
   private val messageHandler = new MessageHandler(mockedKeyValueStore)
 
@@ -46,6 +46,15 @@ class MessageHandlerSpec extends FlatSpec with Matchers with MockFactory {
       messageHandler
         .getResponse(messageHandler.textMessageFromString(s"SET KEY $testKey $testValue", channel))
         .contains(messageHandler.textMessageFromString(s"Could not set $testValue for key $testKey", channel))
+    )
+  }
+
+  it should "not respond to an invalid command" in {
+    assert(
+      messageHandler
+        .getResponse(
+          messageHandler.textMessageFromString("Hey slackbot, this is your friend the invalid command.", channel)
+        ).isEmpty
     )
   }
 
