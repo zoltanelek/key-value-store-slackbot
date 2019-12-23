@@ -15,6 +15,9 @@ class MessageHandler(redisClient: RedisClient) {
 
   private val log = Logger("MessageHandler")
 
+  /**
+   * Tries to parse the incoming message and fetches the response for it.
+   */
   def getResponse(incoming: Message): Option[Message] = {
     incoming match {
       case textMessage: TextMessage     => handleJson(textMessage.getStrictText.parseJson.asJsObject)
