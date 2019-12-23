@@ -55,3 +55,5 @@ To get a value send:
 GET KEY foo
 ```
 to fetch the value for the key `foo`.
+
+Currently the bot only accepts word characters in keys and values.
