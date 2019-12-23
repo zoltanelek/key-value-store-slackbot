@@ -12,11 +12,12 @@ libraryDependencies ++= Seq(
   "com.typesafe.akka" %% "akka-stream" % akkaVersion,
   "com.typesafe.akka" %% "akka-http-core" % akkaHttpVersion,
   "com.typesafe.akka" %% "akka-http-spray-json" % akkaHttpVersion,
-  "ch.qos.logback" % "logback-classic" % "1.2.3",
-  "org.scalatest" %% "scalatest" % "3.0.8" % Test,
-  "org.scalacheck" %% "scalacheck" % "1.14.1" % Test,
   "net.debasishg" %% "redisclient" % "3.20",
-  "com.softwaremill.macwire" %% "macros" % "2.3.3" % Provided
+  "ch.qos.logback" % "logback-classic" % "1.2.3",
+  "com.softwaremill.macwire" %% "macros" % "2.3.3" % Provided,
+  "org.scalamock" %% "scalamock" % "4.4.0" % Test,
+  "org.scalatest" %% "scalatest" % "3.0.8" % Test,
+  "org.scalacheck" %% "scalacheck" % "1.14.1" % Test
 )
 
 // Create a default Scala style task to run with tests
@@ -30,4 +31,4 @@ compileScalastyle := scalastyle.in(Compile).toTask("").value
 (compile in Compile) := ((compile in Compile) dependsOn compileScalastyle).value
 
 // Wartremover configuration
-wartremoverWarnings  ++= Warts.allBut(Wart.Equals, Wart.Any)
+wartremoverWarnings in (Compile, compile) ++= Warts.allBut(Wart.Equals, Wart.Any)

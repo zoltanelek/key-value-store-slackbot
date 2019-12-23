@@ -12,8 +12,8 @@ trait AppDependencies {
 
   implicit val actorSystem: ActorSystem = ActorSystem()
   lazy val config: Config = ConfigLoader.loadConfig
-  lazy val redisClient: RedisClient = new RedisClient(config.redisHost, config.redisPort)
 
+  lazy val keyValueStore: KeyValueStore = wire[KeyValueStore]
   lazy val websocketLogic: WebsocketLogic = wire[WebsocketLogic]
   lazy val messageHandler: MessageHandler = wire[MessageHandler]
 

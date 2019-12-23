@@ -9,11 +9,7 @@ import scala.util.Try
 
 import spray.json._
 
-import com.redis._
-
-class MessageHandler(redisClient: RedisClient) {
-
-  private val log = Logger("MessageHandler")
+class MessageHandler(keyValueStore: KeyValueStore) {
 
   /**
    * Tries to parse the incoming message and fetches the response for it.
@@ -44,35 +40,27 @@ class MessageHandler(redisClient: RedisClient) {
 
   private def handleSetKey(key: String, value: String, slackMessage: SlackMessage): Message = {
     val channel = slackMessage.channel
-    val isSuccessful = Try(redisClient.set(calculateFinalKey(key, slackMessage.channel), value)).recover {
-      case err =>
-        log.error(err.getMessage)
-        false
-    }.getOrElse(false)
+    val isSuccessful = keyValueStore.set(key, value, channel)
     if (isSuccessful) {
-      responseFromString(s"$key: $value", channel)
+      textMessageFromString(s"$key: $value", channel)
     } else {
-      responseFromString(s"Could not set $value for key $key", channel)
+      textMessageFromString(s"Could not set $value for key $key", channel)
     }
   }
 
-  private def responseFromString(str: String, channel: String): Message =
+  private def handleGetKey(key: String, slackMessage: SlackMessage): Message = {
+    val channel = slackMessage.channel
+    val valueOpt = keyValueStore.get(key, channel)
+    valueOpt.map { value =>
+      textMessageFromString(s"$key: $value", channel)
+    }.getOrElse {
+      textMessageFromString(s"Could not find value for key $key in this channel", channel)
+    }
+  }
+
+  def textMessageFromString(str: String, channel: String): Message =
     TextMessage(
       SlackMessage("message", str, channel).toJson.toString
     )
 
-  private def handleGetKey(key: String, slackMessage: SlackMessage): Message = {
-    val channel = slackMessage.channel
-    val valueOpt = Try(redisClient.get(calculateFinalKey(key, slackMessage.channel))).getOrElse(None)
-    valueOpt.map { value =>
-      responseFromString(s"$key: $value", channel)
-    }.getOrElse {
-      responseFromString(s"Could not find value for key $key in this channel", channel)
-    }
-  }
-
-  /**
-   * Calculate the final redis key from the channel Id and the key.
-   */
-  private def calculateFinalKey(key: String, channel: String): String = s"$channel-$key"
 }
