@@ -9,5 +9,5 @@ final case class RtmStartResponse(
 )
 
 object RtmStartResponse extends DefaultJsonProtocol {
-  implicit val rtmStartResponseFormat = jsonFormat3(RtmStartResponse.apply)
+  implicit val rtmStartResponseFormat: RootJsonFormat[RtmStartResponse] = jsonFormat3(RtmStartResponse.apply)
 }

@@ -9,5 +9,5 @@ final case class SlackMessage(
 )
 
 object SlackMessage extends DefaultJsonProtocol {
-  implicit val slackMessageFormat = jsonFormat3(SlackMessage.apply)
+  implicit val slackMessageFormat: RootJsonFormat[SlackMessage] = jsonFormat3(SlackMessage.apply)
 }

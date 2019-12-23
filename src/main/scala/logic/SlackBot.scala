@@ -22,7 +22,7 @@ import model._
 import com.redis._
 
 object SlackBot extends App {
-  implicit val system = ActorSystem()
+  implicit val system: ActorSystem = ActorSystem()
 
   import system.dispatcher
 
@@ -40,7 +40,7 @@ object SlackBot extends App {
       response = json.asJsObject.convertTo[RtmStartResponse]
       webSocketUrl <- response match {
         case RtmStartResponse(true, Some(url), _) => Future.successful(url)
-        case _ => Future.failed(new IllegalArgumentException(s"Fetching websocket url from slack was unsuccessful. " +
+        case _ => Future.failed[String](new IllegalArgumentException(s"Fetching websocket url from slack was unsuccessful. " +
           s"Error message: ${response.error.getOrElse("N/A")}"))
       }
     } yield webSocketUrl
@@ -109,20 +109,22 @@ object SlackBot extends App {
     val bufferSize = 10
     val elementsToProcess = 5
 
+    @SuppressWarnings(Array("org.wartremover.warts.ToString"))
     val queueDescription: Source[Message, SourceQueueWithComplete[Message]] = Source
       .queue[Message](bufferSize, OverflowStrategy.backpressure)
       .throttle(elementsToProcess, 3.second)
       .map { out =>
-        log.debug(s"OUT $out")
+        log.debug(s"OUT ${out.toString}")
         out
       }
 
     val (queue, source) = queueDescription.preMaterialize
 
+    @SuppressWarnings(Array("org.wartremover.warts.ToString"))
     val sink = Sink.foreach[Message] { in =>
-      log.debug(s"IN $in")
-      getResponse(in).map(response =>
-        queue.offer(response))
+      log.debug(s"IN ${in.toString}")
+      ignore(getResponse(in).map(response =>
+        queue.offer(response)))
     }
 
     val webSocketFlow = Http().webSocketClientFlow(WebSocketRequest(url))
@@ -137,7 +139,7 @@ object SlackBot extends App {
       if (upgrade.response.status == StatusCodes.SwitchingProtocols) {
         Future.successful(Done)
       } else {
-        throw new RuntimeException(s"Connection failed: ${upgrade.response.status}")
+        Future.failed[Done](new RuntimeException(s"Connection failed: ${upgrade.response.status.toString}"))
       }
     }
 
@@ -145,6 +147,7 @@ object SlackBot extends App {
     closed
   }
 
+  @SuppressWarnings(Array("org.wartremover.warts.Recursion"))
   private def fetchUrlAndConnect: Future[Done] = (for {
     url <- getWebsocketUrl(config.token)
     _ <- connectToSocket(url)
@@ -156,6 +159,11 @@ object SlackBot extends App {
       after(1.second, system.scheduler)(fetchUrlAndConnect)
   }
 
-  fetchUrlAndConnect
+  @specialized def ignore[A](evaluateForSideEffectOnly: A): Unit = {
+    val _ = evaluateForSideEffectOnly
+    () //Return unit to prevent warning due to discarding value
+  }
+
+  ignore(fetchUrlAndConnect)
 
 }

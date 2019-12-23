@@ -27,3 +27,6 @@ testScalastyle := scalastyle.in(Test).toTask("").value
 lazy val compileScalastyle = taskKey[Unit]("compileScalastyle")
 compileScalastyle := scalastyle.in(Compile).toTask("").value
 (compile in Compile) := ((compile in Compile) dependsOn compileScalastyle).value
+
+// Wartremover configuration
+wartremoverWarnings  ++= Warts.allBut(Wart.Equals, Wart.Any)
