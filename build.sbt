@@ -15,7 +15,8 @@ libraryDependencies ++= Seq(
   "ch.qos.logback" % "logback-classic" % "1.2.3",
   "org.scalatest" %% "scalatest" % "3.0.8" % Test,
   "org.scalacheck" %% "scalacheck" % "1.14.1" % Test,
-  "net.debasishg" %% "redisclient" % "3.20"
+  "net.debasishg" %% "redisclient" % "3.20",
+  "com.softwaremill.macwire" %% "macros" % "2.3.3" % Provided
 )
 
 // Create a default Scala style task to run with tests
