@@ -17,3 +17,13 @@ libraryDependencies ++= Seq(
   "org.scalacheck" %% "scalacheck" % "1.14.1" % Test,
   "net.debasishg" %% "redisclient" % "3.20"
 )
+
+// Create a default Scala style task to run with tests
+lazy val testScalastyle = taskKey[Unit]("testScalastyle")
+testScalastyle := scalastyle.in(Test).toTask("").value
+(test in Test) := ((test in Test) dependsOn testScalastyle).value
+
+// Create a default Scala style task to run with compiles
+lazy val compileScalastyle = taskKey[Unit]("compileScalastyle")
+compileScalastyle := scalastyle.in(Compile).toTask("").value
+(compile in Compile) := ((compile in Compile) dependsOn compileScalastyle).value

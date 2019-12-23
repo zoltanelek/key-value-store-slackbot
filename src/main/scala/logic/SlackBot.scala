@@ -28,7 +28,7 @@ object SlackBot extends App {
 
   private val log = Logger("SlackBot")
   private val config = ConfigLoader.loadConfig
-  private val redisClient = new RedisClient("localhost", 6379)
+  private val redisClient = new RedisClient(config.redisHost, config.redisPort)
 
   private def getWebsocketUrl(token: String): Future[String] = {
     val queryParams = Query(("token" -> token))

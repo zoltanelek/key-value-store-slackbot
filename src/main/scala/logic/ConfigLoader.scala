@@ -6,7 +6,10 @@ import model.Config
 object ConfigLoader {
   def loadConfig: Config = {
     val conf = ConfigFactory.load("application.conf");
-    val token = conf.getString("slackbot.token")
-    Config(token)
+    Config(
+      conf.getString("slackbot.token"),
+      conf.getInt("slackbot.redisPort"),
+      conf.getString("slackbot.redisHost")
+    )
   }
 }
