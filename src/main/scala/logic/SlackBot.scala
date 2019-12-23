@@ -48,15 +48,15 @@ object SlackBot extends App {
 
   private def getResponse(incoming: Message): Option[Message] = {
     incoming match {
-      case textMessage: TextMessage => handleJson(textMessage.getStrictText.parseJson.asJsObject)
+      case textMessage: TextMessage     => handleJson(textMessage.getStrictText.parseJson.asJsObject)
       case binaryMessage: BinaryMessage => handleJson(binaryMessage.getStrictData.utf8String.parseJson.asJsObject)
     }
   }
 
-  private  def handleJson(jsObject: JsObject): Option[Message] = {
+  private def handleJson(jsObject: JsObject): Option[Message] = {
     jsObject.fields.get("type") match {
       case Some(JsString("message")) => Try(jsObject.convertTo[SlackMessage]).toOption.flatMap(handleSlackMessage)
-      case _ => None
+      case _                         => None
     }
   }
 
@@ -66,8 +66,8 @@ object SlackBot extends App {
   private def handleSlackMessage(slackMessage: SlackMessage): Option[Message] =
     slackMessage.text match {
       case setKeyPattern(_, key, value) => Some(handleSetKey(key, value, slackMessage))
-      case getKeyPattern(_, key) => Some(handleGetKey(key, slackMessage))
-      case _ => None
+      case getKeyPattern(_, key)        => Some(handleGetKey(key, slackMessage))
+      case _                            => None
     }
 
   private def handleGetKey(key: String, slackMessage: SlackMessage): Message = {
@@ -87,12 +87,12 @@ object SlackBot extends App {
 
   private def handleSetKey(key: String, value: String, slackMessage: SlackMessage): Message = {
     val channel = slackMessage.channel
-    val isSuccessful = Try(redisClient.set(calculateRedisKey(key, slackMessage.channel), value)).recover{
+    val isSuccessful = Try(redisClient.set(calculateRedisKey(key, slackMessage.channel), value)).recover {
       case err =>
         log.error(err.getMessage)
         false
     }.getOrElse(false)
-    if (isSuccessful){
+    if (isSuccessful) {
       responseFromString(s"$key: $value", channel)
     } else {
       responseFromString(s"Could not set $value for key $key", channel)
@@ -119,20 +119,19 @@ object SlackBot extends App {
 
     val (queue, source) = queueDescription.preMaterialize
 
-    val sink = Sink.foreach[Message]{ in =>
+    val sink = Sink.foreach[Message] { in =>
       log.debug(s"IN $in")
       getResponse(in).map(response =>
-        queue.offer(response)
-      )
+        queue.offer(response))
     }
 
     val webSocketFlow = Http().webSocketClientFlow(WebSocketRequest(url))
 
     val (upgradeResponse, closed) =
-    source
-      .viaMat(webSocketFlow)(Keep.right)
-      .toMat(sink)(Keep.both)
-      .run()
+      source
+        .viaMat(webSocketFlow)(Keep.right)
+        .toMat(sink)(Keep.both)
+        .run()
 
     val connected = upgradeResponse.flatMap { upgrade =>
       if (upgrade.response.status == StatusCodes.SwitchingProtocols) {
@@ -149,9 +148,9 @@ object SlackBot extends App {
   private def fetchUrlAndConnect: Future[Done] = (for {
     url <- getWebsocketUrl(config.token)
     _ <- connectToSocket(url)
-    _ =  log.info("Slack closed the connection. Trying to reconnect...")
+    _ = log.info("Slack closed the connection. Trying to reconnect...")
     reconnect <- fetchUrlAndConnect
-  } yield reconnect).recoverWith{
+  } yield reconnect).recoverWith {
     case err =>
       log.error(err.getMessage)
       after(1.second, system.scheduler)(fetchUrlAndConnect)
